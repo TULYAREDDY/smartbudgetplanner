@@ -1,8 +1,8 @@
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session, send_file, make_response
-from logic.greedy_optimizer import greedy_optimizer
-from logic.dp_emi_selector import dp_emi_selector
-from logic.decision_tree_advice import decision_tree_advice
-from logic.backtrack_expenses import backtrack_expenses
+from .logic.greedy_optimizer import greedy_optimizer
+from .logic.dp_emi_selector import dp_emi_selector
+from .logic.decision_tree_advice import decision_tree_advice
+from .logic.backtrack_expenses import backtrack_expenses
 from typing import List, Dict
 import json
 import google.generativeai as genai
@@ -30,15 +30,17 @@ model = genai.GenerativeModel('gemini-2.0-flash')
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'supersecretkey')  # Needed for session management
 
-USERS_FILE = 'users.json'
-USERS_DIR = 'users'
+USERS_FILE = os.path.join(os.path.dirname(__file__), '..', 'data', 'users.json')
+USERS_DIR = os.path.join(os.path.dirname(__file__), '..', 'data', 'users')
 if not os.path.exists(USERS_DIR):
     os.makedirs(USERS_DIR)
 
 # Ensure required folders exist at startup
-for folder in ['results', 'data', 'users']:
-    if not os.path.exists(folder):
-        os.makedirs(folder)
+data_dir = os.path.join(os.path.dirname(__file__), '..', 'data')
+for folder in ['results', 'users']:
+    folder_path = os.path.join(data_dir, folder)
+    if not os.path.exists(folder_path):
+        os.makedirs(folder_path)
 
 # Helper to load users
 def load_users():
@@ -190,7 +192,7 @@ def save_results_to_json(results: Dict, user_name: str):
     safe_filename = safe_filename.replace(' ', '_').lower()
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"{safe_filename}_{timestamp}.json"
-    results_dir = "results"
+    results_dir = os.path.join(os.path.dirname(__file__), '..', 'data', 'results')
     if not os.path.exists(results_dir):
         os.makedirs(results_dir)
     filepath = os.path.join(results_dir, filename)
@@ -264,7 +266,8 @@ def login_required(f):
 def index():
     """Render the main page."""
     # Get list of available bank statements
-    bank_statements = [f for f in os.listdir('bank') if f.endswith('.json')]
+    bank_dir = os.path.join(os.path.dirname(__file__), '..', 'data', 'bank')
+    bank_statements = [f for f in os.listdir(bank_dir) if f.endswith('.json')]
     
     # Generate a unique version string for cache busting
     current_time_version = datetime.now().timestamp()
@@ -275,7 +278,8 @@ def index():
 def get_bank_statement(filename):
     """Get bank statement data."""
     try:
-        with open(os.path.join('bank', filename), 'r') as f:
+        bank_dir = os.path.join(os.path.dirname(__file__), '..', 'data', 'bank')
+        with open(os.path.join(bank_dir, filename), 'r') as f:
             return jsonify(json.load(f))
     except Exception as e:
         return jsonify({'error': str(e)}), 400
@@ -349,7 +353,8 @@ def analyze():
         # --- Log storage: save every analysis with timestamp ---
         now = datetime.now()
         timestamp_str = now.strftime("%Y_%m_%d_%H%M%S")
-        user_dir = os.path.join('data', user_name)
+        data_dir = os.path.join(os.path.dirname(__file__), '..', 'data')
+        user_dir = os.path.join(data_dir, user_name)
         os.makedirs(user_dir, exist_ok=True)
         log_path = os.path.join(user_dir, f"{user_name}_{timestamp_str}.json")
         # Compose log dict
@@ -399,7 +404,8 @@ def analyze():
 @login_required
 def api_past_reports():
     username = session['username']
-    user_dir = os.path.join('data', username)
+    data_dir = os.path.join(os.path.dirname(__file__), '..', 'data')
+    user_dir = os.path.join(data_dir, username)
     logs = []
     if os.path.exists(user_dir):
         files = sorted([f for f in os.listdir(user_dir) if f.endswith('.json')], reverse=True)
@@ -432,7 +438,8 @@ def api_past_reports():
 @login_required
 def api_financial_score():
     username = session['username']
-    user_dir = os.path.join('data', username)
+    data_dir = os.path.join(os.path.dirname(__file__), '..', 'data')
+    user_dir = os.path.join(data_dir, username)
     logs = []
     if os.path.exists(user_dir):
         files = sorted([f for f in os.listdir(user_dir) if f.endswith('.json')], reverse=True)
@@ -493,12 +500,14 @@ def api_financial_score():
 @login_required
 def api_download_report():
     username = session['username']
-    if not os.path.exists('results'):
+    data_dir = os.path.join(os.path.dirname(__file__), '..', 'data')
+    results_dir = os.path.join(data_dir, 'results')
+    if not os.path.exists(results_dir):
         return make_response('No report found (results folder missing).', 404)
-    user_files = sorted([f for f in os.listdir('results') if f.startswith(username)], reverse=True)
+    user_files = sorted([f for f in os.listdir(results_dir) if f.startswith(username)], reverse=True)
     if user_files:
         latest = user_files[0]
-        return send_file(os.path.join('results', latest), as_attachment=True, download_name=f"{username}_{datetime.now().strftime('%Y_%m')}_analysis.json")
+        return send_file(os.path.join(results_dir, latest), as_attachment=True, download_name=f"{username}_{datetime.now().strftime('%Y_%m')}_analysis.json")
     return make_response('No report found.', 404)
 
 if __name__ == '__main__':
