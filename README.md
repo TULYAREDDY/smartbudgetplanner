@@ -114,17 +114,6 @@ smartbudgetplanner/
 - `GET /api/financial_score` - Financial health score
 - `GET /api/download_report` - Download latest report
 
-## Screenshots
-
-*Main Dashboard*
-![Dashboard](screenshots/dashboard.png)
-
-*Analysis Results*
-![Results](screenshots/analysis.png)
-
-*Financial Score Tracking*
-![Score](screenshots/score.png)
-
 ## Future Improvements
 
 - Database integration (PostgreSQL/MongoDB)
